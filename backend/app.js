@@ -23,32 +23,6 @@ app.use(cors({origin:"*"}));
 
 
 // Routes
-app.post("/api/v1/student",isAuthenticatedUser, authorizeRoles('admin'),  async (req, res) => {
-  try {
-    const studentBioData = req.body;
-    studentBioData.createdAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const tableName = "students";
-
-    const columns = Object.keys(studentBioData).join(", ");
-    const valuesPlaceholders = Object.keys(studentBioData)
-      .map(() => "?")
-      .join(", ");
-
-    const insertQuery = `INSERT INTO ${tableName} (${columns}) VALUES (${valuesPlaceholders})`;
-
-    const values = Object.values(studentBioData);
-
-    await db.promise().query(insertQuery, values);
-
-    res.status(201).json({
-      success: true,
-      message: `Student created successfully`,
-    });
-  } catch (error) {
-    console.error("Error creating student bio-data:", error.message);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {

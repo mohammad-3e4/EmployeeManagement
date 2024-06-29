@@ -8,13 +8,43 @@ const db = require("../config/database");
 dotenv.config({ path: "backend/config/config.env" });
 
 //  Register new us
+exports.createEmployee = asyncHandler(async (req, res, next) => {
+  const company_id = req.company.id;
+  try {
+    const employeeData = req.body;
+    employeeData.company_id = company_id;
+    employeeData.createdAt = new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
 
-exports.getMember = asyncHandler(async (req, res, next) => {
+    const columns = Object.keys(employeeData).join(", ");
+    const valuesPlaceholders = Object.keys(employeeData)
+      .map(() => "?")
+      .join(", ");
+
+    const insertQuery = `INSERT INTO employees (${columns}) VALUES (${valuesPlaceholders})`;
+
+    const values = Object.values(employeeData);
+
+    await db.promise().query(insertQuery, values);
+
+    res.status(201).json({
+      success: true,
+      message: `Employee created successfully`,
+    });
+  } catch (error) {
+    console.error("Error creating employee:", error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+exports.getEmployeeInformation = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
   let sql;
   let values;
   if (id) {
-    sql = "SELECT * FROM staff WHERE staff_id = ?";
+    sql = "SELECT * FROM employees WHERE employee_id = ?";
     values = [id];
   } else {
     return next(new ErrorHandler("Missing parameters", 400));
@@ -27,44 +57,43 @@ exports.getMember = asyncHandler(async (req, res, next) => {
     }
 
     if (result.length > 0) {
-      res.status(200).json({ success: true, staff: result[0] });
+      res.status(200).json({ success: true, employee: result[0] });
     } else {
       return next(new ErrorHandler("Student not found", 404));
     }
   });
 });
 
-exports.getStaff = asyncHandler(async (req, res, next) => {
-  let sql = "SELECT * FROM staff";
+exports.getEmployees = asyncHandler(async (req, res, next) => {
+  let sql = "SELECT * FROM employees";
 
-  const { role, name } = req.query;
-
-  if (role && name) {
-    sql += ` WHERE role = ? AND staff_name = ?`;
-    db.query(sql, [role, name], (err, result) => {
+  const { company_name, name } = req.query;
+  if (company_name && name) {
+    sql += ` WHERE company_name = ? AND full_name = ?`;
+    db.query(sql, [company_name, name], (err, result) => {
       if (err) {
         console.error("Error during retrieval:", err);
         return next(new ErrorHandler("Error during retrieval", 500));
       }
-      res.status(200).json({ success: true, staff: result });
+      res.status(200).json({ success: true, employees: result });
     });
-  } else if (role) {
-    sql += ` WHERE role = ?`;
-    db.query(sql, [role], (err, result) => {
+  } else if (company_name) {
+    sql += ` WHERE company_name = ?`;
+    db.query(sql, [company_name], (err, result) => {
       if (err) {
         console.error("Error during retrieval:", err);
         return next(new ErrorHandler("Error during retrieval", 500));
       }
-      res.status(200).json({ success: true, staff: result });
+      res.status(200).json({ success: true, employees: result });
     });
   } else if (name) {
-    sql += ` WHERE staff_name = ?`;
+    sql += ` WHERE full_name = ?`;
     db.query(sql, [name], (err, result) => {
       if (err) {
         console.error("Error during retrieval:", err);
         return next(new ErrorHandler("Error during retrieval", 500));
       }
-      res.status(200).json({ success: true, students: result });
+      res.status(200).json({ success: true, employees: result });
     });
   } else {
     db.query(sql, (err, result) => {
@@ -72,36 +101,54 @@ exports.getStaff = asyncHandler(async (req, res, next) => {
         console.error("Error during retrieval:", err);
         return next(new ErrorHandler("Error during retrieval", 500));
       }
-      res.status(200).json({ success: true, staff: result });
+      res.status(200).json({ success: true, employees: result });
     });
   }
 });
 
 exports.updateMember = asyncHandler(async (req, res, next) => {
   const updatedFields = req.body;
+  const company_id = req.company.id;
   const { id } = req.params;
-  const updateFieldsString = Object.keys(updatedFields)
-    .map((key) => `${key}="${updatedFields[key]}"`)
-    .join(", ");
 
-  const sql = `UPDATE staff SET ${updateFieldsString} WHERE staff_id = '${Number(
-    id
-  )}';`;
+  const checkSql = `SELECT company_id FROM employees WHERE employee_id = ?`;
 
-  db.query(sql, (err, result) => {
+  db.query(checkSql, [Number(id)], (err, results) => {
     if (err) {
-      console.error("Error during update:", err);
-      next(new ErrorHandler("Error during update", 500));
+      console.error("Error during check:", err);
+      return next(new ErrorHandler("Error during check", 500));0.
     }
 
-    if (result.affectedRows > 0) {
-      res.status(200).json({ success: true, message: "Update successful" });
-    } else {
-      next(new ErrorHandler("User not found or no changes applied", 404));
+    if (results.length === 0) {
+      return next(new ErrorHandler("User not found", 404));
     }
+
+    if (results[0].company_id !== company_id) {
+      return next(new ErrorHandler("Unauthorized to update this employee", 403));
+    }
+
+    // Proceed with the update
+    const updateFieldsString = Object.keys(updatedFields)
+      .map((key) => `${key} = ?`)
+      .join(", ");
+    const updateValues = Object.values(updatedFields).concat(Number(id));
+
+    const sql = `UPDATE employees SET ${updateFieldsString} WHERE employee_id = ?`;
+
+    db.query(sql, updateValues, (err, result) => {
+      if (err) {
+        console.error("Error during update:", err);
+        return next(new ErrorHandler("Error during update", 500));
+      }
+
+      if (result.affectedRows > 0) {
+        res.status(200).json({ success: true, message: "Update successful" });
+      } else {
+        next(new ErrorHandler("User not found or no changes applied", 404));
+      }
+    });
   });
 });
-
 exports.deleteMember = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
 
@@ -130,12 +177,10 @@ exports.deleteMember = asyncHandler(async (req, res, next) => {
 exports.markAbsent = asyncHandler(async (req, res, next) => {
   const { staff_id, attendance, typeCase } = req.body;
   if (!staff_id) {
-    return next(
-      new ErrorHandler(`Staff Id (${staff_id}) is required`, 400)
-    );
+    return next(new ErrorHandler(`Staff Id (${staff_id}) is required`, 400));
   }
 
-  if (typeCase === 'leave_date') {
+  if (typeCase === "leave_date") {
     // Delete existing record with the same student_id and absent_date
     const deleteSql = `DELETE FROM staff_attendance WHERE staff_id = ? AND absent_date = ?`;
     const deleteValues = [staff_id, attendance];

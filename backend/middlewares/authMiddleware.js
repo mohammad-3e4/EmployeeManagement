@@ -10,7 +10,6 @@ exports.isAuthenticatedUser = async (request, response, next) => {
 
     if (!token) {
     
-
       return next(
         new ErrorHandler("Login first to access this resource!", 401)
       ); 

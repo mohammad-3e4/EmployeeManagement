@@ -5,15 +5,18 @@ const {
   authorizeRoles,
 } = require("../middlewares/authMiddleware");
 const {
-  getMember,
-  getStaff,
+  getEmployeeInformation,
+  getEmployees,
   deleteMember,
   updateMember,
   getEntries,
   markPresent,
   markAbsent,
-} = require("../controllers/staffController");
-router.get("/", isAuthenticatedUser, authorizeRoles("admin"), getStaff);
+  createEmployee
+} = require("../controllers/employeeController");
+
+router.post("/create", isAuthenticatedUser, createEmployee);
+router.get("/", isAuthenticatedUser, getEmployees);
 router.patch("/present", isAuthenticatedUser, authorizeRoles("admin", 'teacher'), markPresent);
 router.get(
   "/entries",
@@ -23,10 +26,9 @@ router.get(
 );
 router
   .route("/:id")
-  .get(isAuthenticatedUser, authorizeRoles("admin", 'teacher', ), getMember)
+  .get(isAuthenticatedUser, authorizeRoles("admin", 'teacher', ), getEmployeeInformation)
   .delete(isAuthenticatedUser, authorizeRoles("admin"), deleteMember)
-  .post(isAuthenticatedUser, authorizeRoles("admin", "teacher"), updateMember);
-
+  .post(isAuthenticatedUser, updateMember);
 router.put(
   "/attendance",
   isAuthenticatedUser,
